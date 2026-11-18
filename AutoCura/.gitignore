@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Env / secrets ---
+.env
+*.db
+
+# --- ML artifacts ---
+backend/trained_models/*.joblib
+backend/trained_models/*.json
+backend/datasets/processed/*.csv
+
+# --- Recovery module scratch space (disk-cleanup simulation target) ---
+.autocura_scratch/
+backend/.autocura_scratch/
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- OS / editor ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+*.log

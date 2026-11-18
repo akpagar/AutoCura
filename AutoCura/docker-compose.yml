@@ -1,0 +1,8 @@
+# AutoCura - Root compose entrypoint
+#
+# `docker compose up --build` from the project root brings up the full
+# stack. Phase 1 wires backend + postgres; frontend and controlled test
+# services are added in later phases as the include files grow.
+
+include:
+  - infrastructure/docker-compose.yml

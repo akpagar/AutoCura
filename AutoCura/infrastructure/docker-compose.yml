@@ -1,0 +1,110 @@
+# AutoCura - Infrastructure compose (Phases 1-5)
+#
+# Brings up PostgreSQL, the backend API, and the controlled test
+# containers the recovery module (Phase 5) restarts/scales/migrates
+# against. The frontend is added separately in Phase 7.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: autocura_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: autocura
+      POSTGRES_PASSWORD: autocura
+      POSTGRES_DB: autocura
+    ports:
+      - "5432:5432"
+    volumes:
+      - autocura_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autocura"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: autocura_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://autocura:autocura@postgres:5432/autocura
+      APP_ENV: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Lets the backend's Docker SDK calls (restart/scale/migrate
+      # recovery actions) control the sibling containers below. This is
+      # the standard "Docker-out-of-Docker" pattern -- the backend never
+      # gets its own nested Docker daemon, it just talks to the host's.
+      # Works with Docker Desktop on Windows without extra configuration.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # --- Controlled test environment for the recovery module ---
+  # Names must keep the `autocura_test_` prefix -- app/recovery/docker_client.py
+  # refuses to act on any container name that doesn't. All three workers
+  # start running by default (full pool); auto_scaling.py's "scale down"
+  # stops some of them, and "scale up" starts them back.
+
+  autocura_test_primary_service:
+    build:
+      context: ./services/test_service
+      dockerfile: Dockerfile
+    container_name: autocura_test_primary_service
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: primary_service
+    ports:
+      - "9000:9000"
+
+  autocura_test_worker_1:
+    build:
+      context: ./services/test_service
+      dockerfile: Dockerfile
+    container_name: autocura_test_worker_1
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: worker_1
+    ports:
+      - "9001:9000"
+
+  autocura_test_worker_2:
+    build:
+      context: ./services/test_service
+      dockerfile: Dockerfile
+    container_name: autocura_test_worker_2
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: worker_2
+    ports:
+      - "9002:9000"
+
+  autocura_test_worker_3:
+    build:
+      context: ./services/test_service
+      dockerfile: Dockerfile
+    container_name: autocura_test_worker_3
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: worker_3
+    ports:
+      - "9003:9000"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: autocura_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  autocura_pgdata:
